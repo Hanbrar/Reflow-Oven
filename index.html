@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ELEC 291 Reflow Oven Controller</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Frutiger', 'Frutiger Next', 'Helvetica Neue', Arial, sans-serif;
+      background: url('https://preview.redd.it/over-50-frutiger-aero-wallpapers-2008ify-your-pc-v0-10bxlsc2nz9b1.jpg?width=1920&format=pjpg&auto=webp&s=609cc75c9819ba619a7a5567b53dc3e60a5f1b47') no-repeat center center fixed;
+      background-size: cover;
+      background-color: #e6f2ff;
+      color: #333;
+      line-height: 1.6;
+    }
+    header {
+      background: linear-gradient(135deg, rgba(0,123,255,0.8), rgba(0,93,173,0.8));
+      color: #fff;
+      padding: 1.5rem;
+      text-align: center;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      backdrop-filter: blur(10px);
+    }
+    header h1 {
+      font-size: 2rem;
+      letter-spacing: 1px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .dashboard {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      grid-gap: 2rem;
+    }
+    @media (max-width: 768px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+    }
+    .panel {
+      background: rgba(255,255,255,0.6);
+      border-radius: 10px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+      backdrop-filter: blur(8px);
+    }
+    /* Live graph section */
+    .live-graph {
+      min-height: 80px;
+    }
+    .live-graph h2 {
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+      color: #003366;
+    }
+    /* Control panel section */
+    .control-panel h2 {
+      margin-bottom: 1rem;
+      font-size: 1.5rem;
+      color: #003366;
+    }
+    .data-display div,
+    .status-indicators div,
+    .alerts div {
+      margin-bottom: 0.75rem;
+    }
+    .data-display div strong {
+      display: inline-block;
+      width: 140px;
+    }
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      margin: 1rem 0;
+    }
+    .controls button {  
+      flex: 1;
+      padding: 0.75rem;
+      margin: 0 0.5rem;
+      border: none;
+      border-radius: 5px;
+      background: linear-gradient(135deg, #007aff, #005bb5);
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      font-weight: bold;
+    }
+    .controls button:hover {
+      background: linear-gradient(135deg, #005bb5, #007aff);
+    }
+    .controls button:first-child {
+      margin-left: 0;
+    }
+    .controls button:last-child {
+      margin-right: 0;
+    }
+    .serial-connect {
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    .serial-connect button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background: linear-gradient(135deg, #28a745, #218838);
+      color: #fff;
+      transition: background 0.3s ease;
+    }
+    .serial-connect button:hover {
+      background: linear-gradient(135deg, #218838, #28a745);
+    }
+    .alerts h3 {
+      margin-bottom: 0.5rem;
+      color: #003366;
+    }
+    .alert {
+      padding: 0.75rem;
+      border-radius: 5px;
+      color: #fff;
+      font-weight: bold;
+    }
+    .alert.info {
+      background: linear-gradient(135deg, #2196F3, #1976D2);
+    }
+    .alert.warning {
+      background: linear-gradient(135deg, #FF9800, #F57C00);
+    }
+    .alert.critical {
+      background: linear-gradient(135deg, #f44336, #d32f2f);
+    }
+    .previous-cycles {
+      margin-top: 2rem;
+      background: rgba(255,255,255,0.7);
+      padding: 1rem;
+      border-radius: 10px;
+    }
+    .previous-cycles h3 {
+      text-align: center;
+      margin-bottom: 1rem;
+      color: #003366;
+    }
+    .previous-cycles table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .previous-cycles th, .previous-cycles td {
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ELEC 291 Reflow Oven Controller</h1>
+  </header>
+  
+  <div class="container">
+    <div class="dashboard">
+      <!-- Live Graph Section -->
+      <section class="live-graph panel">
+        <h2>Live Reflow Profile</h2>
+        <!-- Canvas for the live graph using Chart.js -->
+        <canvas id="reflowChart" width="100%" height="80">
+          Your browser does not support the HTML canvas element.
+        </canvas>
+      </section>
+      
+      <!-- Control Panel Section -->
+      <section class="control-panel panel">
+        <h2>Control Panel</h2>
+        
+        <!-- Serial Port Connect Button -->
+        <div class="serial-connect">
+          <button id="connectBtn">Connect Serial Port</button>
+        </div>
+        
+        <!-- Data Display -->
+        <div class="data-display">
+          <div><strong>Current Temp:</strong> <span id="currentTemp">0°C</span></div>
+          <div><strong>Setpoint:</strong> <span id="setpointTemp">220°C</span></div>
+          <div><strong>Time Left:</strong> <span id="timeRemaining">00:00</span></div>
+        </div>
+        
+        <!-- Status Indicators -->
+        <div class="status-indicators">
+          <h3>State</h3>
+          <div id="phaseStatus">Idle</div>
+        </div>
+        
+        <!-- Control Buttons -->
+        <div class="controls">
+          <button id="startBtn">Start</button>
+          <button id="pauseBtn">Pause</button>
+          <button id="stopBtn">Stop</button>
+        </div>
+        
+        <!-- Alerts and Notifications -->
+        <div class="alerts">
+          <h3>Alerts</h3>
+          <div id="alertArea">
+            <div class="alert info">System running normally.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+    
+    <!-- Previous Cycles Section -->
+    <section class="previous-cycles panel">
+      <h3>Previous Oven Cycles</h3>
+      <table id="previousCyclesTable">
+        <thead>
+          <tr>
+            <th>Cycle</th>
+            <th>Data Points</th>
+            <th>Download CSV</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+        </tbody>
+      </table>
+    </section>
+  </div>
+  
+  <!-- JavaScript  -->
+  <script>
+    let countdownInterval = null;
+    function startCountdown(duration) {
+      let timeLeft = duration;
+      updateTimeDisplay(timeLeft);
+      if (countdownInterval) clearInterval(countdownInterval);
+      countdownInterval = setInterval(() => {
+        timeLeft--;
+        updateTimeDisplay(timeLeft);
+        if (timeLeft <= 0) {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+          console.log("Countdown complete!");
+        }
+      }, 1000);
+    }
+    function updateTimeDisplay(seconds) {
+      const minutes = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      document.getElementById('timeRemaining').textContent =
+        `${minutes < 10 ? '0' : ''}${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+    
+    let chart;
+    let timeCounter = 0;
+    const maxDataPoints = 100;
+    function initializeChart() {
+      const ctx = document.getElementById('reflowChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Temperature (°C)',
+            data: [],
+            borderColor: 'red',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1
+          }]
+        },
+        options: {
+          animation: false,
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Real-Time Temperature'
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Time (s)'
+              }
+            },
+            y: {
+              title: {
+                display: true,
+                text: 'Temperature (°C)'
+              },
+              min: 0,
+              max: 300
+            }
+          }
+        }
+      });
+    }
+    function updateChart(temperature) {
+      timeCounter++;
+      chart.data.labels.push(timeCounter);
+      chart.data.datasets[0].data.push(temperature);
+      if (chart.data.labels.length > maxDataPoints) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+      }
+      if (temperature < 26) {
+        chart.data.datasets[0].borderColor = 'blue';
+      } else if (temperature < 30) {
+        chart.data.datasets[0].borderColor = 'orange';
+      } else {
+        chart.data.datasets[0].borderColor = 'red';
+      }
+      const sum = chart.data.datasets[0].data.reduce((acc, val) => acc + val, 0);
+      const avg = sum / chart.data.datasets[0].data.length;
+      chart.options.plugins.title.text = `Real-Time Temperature (Current Avg: ${avg.toFixed(2)}°C)`;
+      chart.update();
+    }
+    
+    let currentCycleData = [];      // Stores the current cycle's data rows
+    let previousCycles = [];        // Array of cycles
+    
+    // Save the previousCycles array to localStorage
+    function savePreviousCycles() {
+      localStorage.setItem("previousCycles", JSON.stringify(previousCycles));
+    }
+    
+    // Load previousCycles from localStorage 
+    function loadPreviousCycles() {
+      const storedCycles = localStorage.getItem("previousCycles");
+      if (storedCycles) {
+        previousCycles = JSON.parse(storedCycles);
+        displayPreviousCycles();
+      }
+    }
+    
+    function convertCycleToCSV(cycleData) {
+      const header = "Time,Temperature,State";
+      return header + "\n" + cycleData.join("\n");
+    }
+    
+    function downloadCycleCSV(cycleIndex) {
+      const cycleData = previousCycles[cycleIndex];
+      const csvContent = convertCycleToCSV(cycleData);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `oven_cycle_${cycleIndex + 1}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    
+    function displayPreviousCycles() {
+      const tbody = document.getElementById('previousCyclesTable').querySelector('tbody');
+      tbody.innerHTML = "";
+      previousCycles.forEach((cycle, index) => {
+        const row = document.createElement('tr');
+        const cellCycle = document.createElement('td');
+        cellCycle.textContent = index + 1;
+        row.appendChild(cellCycle);
+        const cellDataPoints = document.createElement('td');
+        cellDataPoints.textContent = cycle.length;
+        row.appendChild(cellDataPoints);
+        const cellDownload = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.textContent = "Download CSV";
+        btn.addEventListener('click', () => downloadCycleCSV(index));
+        cellDownload.appendChild(btn);
+        row.appendChild(cellDownload);
+        tbody.appendChild(row);
+      });
+    }
+    
+    class LineBreakTransformer {
+      constructor() {
+        this.container = '';
+      }
+      transform(chunk, controller) {
+        this.container += chunk;
+        const lines = this.container.split('\n');
+        this.container = lines.pop();
+        lines.forEach(line => controller.enqueue(line));
+      }
+      flush(controller) {
+        controller.enqueue(this.container);
+      }
+    }
+    
+    async function connectSerial() {
+      if ("serial" in navigator) {
+        try {
+          const port = await navigator.serial.requestPort();
+          await port.open({ baudRate: 115200, dataBits: 8, stopBits: 2, parity: 'none' });
+          const textDecoder = new TextDecoderStream();
+          port.readable.pipeTo(textDecoder.writable);
+          const inputStream = textDecoder.readable
+            .pipeThrough(new TransformStream(new LineBreakTransformer()));
+          const reader = inputStream.getReader();
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+              reader.releaseLock();
+              break;
+            }
+            if (value) {
+              const parts = value.trim().split(',');
+              if (parts.length >= 2) {
+                const rawTemp = parseFloat(parts[0].trim());
+                const temperature = rawTemp / 100; // Convert to actual temperature
+                const state = parts[1].trim();
+                if (!isNaN(temperature)) {
+                  updateChart(temperature);
+                  document.getElementById('currentTemp').textContent = temperature + "°C";
+                  document.getElementById('phaseStatus').textContent = state;
+                  
+                  // Log the data row
+                  currentCycleData.push(`${timeCounter},${temperature},${state}`);
+                  
+                  if (state === "Ramp To Soak" && !countdownInterval) {
+                    startCountdown(600);
+                  }
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error connecting to the serial port:', error);
+        }
+      } else {
+        alert('Web Serial API not supported in this browser.');
+      }
+    }
+    
+    document.getElementById('connectBtn').addEventListener('click', async () => {
+      if (!chart) {
+        initializeChart();
+      }
+      await connectSerial();
+    });
+    
+    document.getElementById('startBtn').addEventListener('click', () => {
+      console.log('Start button pressed');
+    });
+    
+    document.getElementById('pauseBtn').addEventListener('click', () => {
+      console.log('Pause button pressed');
+    });
+    
+    document.getElementById('stopBtn').addEventListener('click', () => {
+      console.log('Stop button pressed');
+      if (currentCycleData.length > 0) {
+        previousCycles.push(currentCycleData.slice());
+        currentCycleData = [];
+        // Update the stored data in localStorage
+        savePreviousCycles();
+        displayPreviousCycles();
+      }
+    });
+    
+    // Load any previously saved cycles when the page loads.
+    window.addEventListener('DOMContentLoaded', loadPreviousCycles);
+  </script>
+</body>
+</html>
